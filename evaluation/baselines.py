@@ -14,7 +14,7 @@ def baseline1_classify_only(y_true: np.ndarray, y_pred: np.ndarray) -> Dict:
 
     Args:
         y_true: 逐帧真实标签 (F,) 或 (N*T,)
-        y_pred: 逐帧预测标签 (F,)
+        y_pred: 逐帧分类标签 (F,)
 
     Returns:
         {"accuracy": float, "violation_detection": "N/A"}

@@ -3,7 +3,7 @@
 
 用法:
     python scripts/3_run_experiment.py                          # 从骨架 + 模型推理
-    python scripts/3_run_experiment.py --skip_inference          # 使用缓存的推理结果
+    python scripts/3_run_experiment.py --skip_inference          # 跳过推理，用已有结果
 """
 
 import sys
@@ -111,7 +111,7 @@ def load_test_data(cfg: dict):
 # ========================= ST-GCN 推理 =========================
 
 def run_stgcn_inference(cfg: dict, samples: list, device: str = None):
-    """用训练好的 ST-GCN 模型对测试样本逐帧推理，结果缓存到 outputs/inference/。"""
+    """用训练好的 ST-GCN 模型对测试样本逐帧推理，结果保存到 outputs/inference/。"""
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -157,12 +157,12 @@ def run_stgcn_inference(cfg: dict, samples: list, device: str = None):
 
         results.append((filename, pred_labels, gt_labels, step_order))
 
-    # 缓存推理结果
+    # 保存推理结果，供 --skip_inference 复用
     cache_dir = cfg.get("output", {}).get("inference_dir", "outputs/inference/")
     os.makedirs(cache_dir, exist_ok=True)
     np.save(os.path.join(cache_dir, "test_inference.npy"),
             np.array([p for _, p, _, _ in results], dtype=object))
-    print(f"  推理缓存已保存至 {cache_dir}")
+    print(f"  推理结果已保存至 {cache_dir}")
 
     return results
 
@@ -196,17 +196,17 @@ def run_experiment(skip_inference: bool = False):
     test_samples = load_test_data(cfg)
 
     if skip_inference:
-        print("\n[2/4] 跳过推理，使用缓存结果 ...")
+        print("\n[2/4] 跳过推理，加载已有结果 ...")
         cache_path = os.path.join(cache_dir, "test_inference.npy")
         if not os.path.exists(cache_path):
             raise FileNotFoundError(
-                f"推理缓存不存在: {cache_path}\n"
-                "  请先不带 --skip_inference 运行一次以生成缓存"
+                f"推理结果不存在: {cache_path}\n"
+                "  请先不带 --skip_inference 运行一次以生成结果文件"
             )
         saved = np.load(cache_path, allow_pickle=True)
         if len(saved) != len(test_samples):
             raise ValueError(
-                f"缓存样本数 ({len(saved)}) 与测试样本数 ({len(test_samples)}) 不匹配"
+                f"结果文件样本数 ({len(saved)}) 与测试样本数 ({len(test_samples)}) 不匹配"
             )
         pred_results = [(s[0], saved[i], s[2], s[3]) for i, s in enumerate(test_samples)]
     else:
@@ -255,7 +255,7 @@ def run_experiment(skip_inference: bool = False):
         results["Baseline2"]["gt_violations"].extend(gt_violations)
         results["Baseline2"]["violations"].extend(b2["violations"])
 
-        # 推理时直接出图（和 YOLO 一样的行为）
+        # 每个样本生成对应图表
         _save_dtw_plot(query, tpl, dtw_path, dtw_dir, filename)
         _save_timeline_plot(blocks, proposed_v, timeline_dir, filename)
 
@@ -479,6 +479,6 @@ def _save_timeline_plot(blocks: list, violations: list,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="SOP-Vision 对比实验")
     parser.add_argument("--skip_inference", action="store_true",
-                        help="跳过 ST-GCN 推理，使用缓存的推理结果")
+                        help="跳过 ST-GCN 推理，使用已保存的推理结果")
     args = parser.parse_args()
     run_experiment(skip_inference=args.skip_inference)

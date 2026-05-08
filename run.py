@@ -3,7 +3,7 @@ SOP-Vision 端到端推理实验 — 直接修改下方参数即可运行。
 
 用法:
     python run.py                    # 完整推理 + 生成图表
-    python run.py --skip_inference   # 跳过推理，用缓存结果
+    python run.py --skip_inference   # 跳过推理，用已有结果
 """
 
 import sys
@@ -16,7 +16,7 @@ sys.path.insert(0, str(ROOT))
 # ============================================================
 #  推理参数（直接在这里改）
 # ============================================================
-SKIP_INFERENCE = False    # True=使用缓存, False=完整推理
+SKIP_INFERENCE = False    # True=用已有结果, False=完整推理
 # ============================================================
 
 if __name__ == "__main__":

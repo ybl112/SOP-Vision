@@ -18,7 +18,7 @@ def compute_per_class_metrics(y_true: np.ndarray, y_pred: np.ndarray,
 
     Args:
         y_true: 真实标签 (N,)
-        y_pred: 预测标签 (N,)
+        y_pred: 分类标签 (N,)
         class_names: 类别名称列表
         average: "macro" / "micro" / "weighted"
 
