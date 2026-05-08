@@ -257,7 +257,7 @@ def run_experiment(skip_inference: bool = False):
 
         # 推理时直接出图（和 YOLO 一样的行为）
         _save_dtw_plot(query, tpl, dtw_path, dtw_dir, filename)
-        _save_timeline_plot(blocks, proposed_v, gts, preds, timeline_dir, filename)
+        _save_timeline_plot(blocks, proposed_v, timeline_dir, filename)
 
     # ---- 结果输出 ----
     print("\n[4/4] 评估结果 ...")
@@ -395,64 +395,82 @@ def _save_dtw_plot(query: np.ndarray, template: np.ndarray, path: list,
 
     os.makedirs(save_dir, exist_ok=True)
     safe = filename.replace("/", "_").replace("\\", "_") or "sample"
-    fig.savefig(os.path.join(save_dir, f"{safe}.png"), dpi=150, bbox_inches="tight")
+    fig.savefig(os.path.join(save_dir, f"{safe}.png"), dpi=300, bbox_inches="tight",
+                facecolor="white", edgecolor="none")
+    fig.savefig(os.path.join(save_dir, f"{safe}.pdf"), bbox_inches="tight",
+                facecolor="white", edgecolor="none")
     plt.close(fig)
 
 
 def _save_timeline_plot(blocks: list, violations: list,
-                        gt_labels: np.ndarray, pred_labels: np.ndarray,
                         save_dir: str, filename: str = ""):
-    """违规检测时间线图（每个样本一张图）。"""
-    total_frames = len(gt_labels)
-    fig, axes = plt.subplots(2, 1, figsize=(12, 4.5), sharex=True,
+    """工序合规检测结果图 — 展示识别的工序块和检测到的违规。"""
+    CLASS_NAMES = {0: "背景", 1: "接令核对", 2: "验电", 3: "拉闸断电",
+                   4: "挂接地线", 5: "悬挂标示牌", 6: "其他"}
+    COLORS = {0: "#d9d9d9", 1: "#a6cee3", 2: "#b2df8a", 3: "#fb9a99",
+              4: "#fdbf6f", 5: "#cab2d6", 6: "#eeeeee"}
+
+    total_frames = blocks[-1]["end"] if blocks else 0
+    fig, axes = plt.subplots(2, 1, figsize=(14, 5), sharex=True,
                              gridspec_kw={"height_ratios": [1, 1]})
 
-    # 上轴：真实/预测标签
+    # 上轴：识别到的工序序列
     ax0 = axes[0]
-    ax0.step(range(total_frames), gt_labels, where="post", linewidth=0.8,
-             color="#1f77b4", alpha=0.7, label="真实标签")
-    ax0.step(range(total_frames), pred_labels, where="post", linewidth=0.8,
-             color="#ff7f0e", alpha=0.7, label="预测标签")
-    ax0.set_ylabel("动作类别", fontsize=9)
-    ax0.set_ylim(-0.5, 6.5)
-    ax0.legend(loc="upper right", fontsize=8, ncol=2)
-    ax0.spines["top"].set_visible(False)
-    ax0.spines["right"].set_visible(False)
-
-    # 下轴：工序块 + 违规标注
-    ax1 = axes[1]
-    colors = ["#d9d9d9", "#a6cee3", "#b2df8a", "#fb9a99", "#fdbf6f", "#cab2d6"]
     for b in blocks:
-        label = b["label"]
-        color = colors[label] if 0 < label <= 5 else "#eeeeee"
-        ax1.axvspan(b["start"], b["end"], alpha=0.5, color=color, edgecolor="none")
+        cid = b["label"]
+        color = COLORS.get(cid, "#eeeeee")
+        ax0.axvspan(b["start"], b["end"], alpha=0.6, color=color, edgecolor="white", lw=0.5)
         mid = (b["start"] + b["end"]) / 2
-        ax1.text(mid, 0.5, str(label), ha="center", va="center", fontsize=7,
-                 color="#333333", fontweight="bold")
+        name = CLASS_NAMES.get(cid, str(cid))
+        ax0.text(mid, 0.5, name, ha="center", va="center", fontsize=8,
+                 color="#222222", fontweight="bold")
+    ax0.set_ylabel("识别工序", fontsize=10)
+    ax0.set_ylim(0, 1)
+    ax0.set_yticks([])
+    for spine in ("top", "right", "left"):
+        ax0.spines[spine].set_visible(False)
+    ax0.set_title("SOP-Vision 工序合规检测结果", fontsize=12, fontweight="bold", pad=8)
+
+    # 下轴：违规标注
+    ax1 = axes[1]
+    # 灰色底条表示整个流程
+    ax1.axvspan(0, total_frames, alpha=0.3, color="#f0f0f0")
+    ax1.set_ylim(0, 1)
+    ax1.set_yticks([])
 
     v_colors = {"漏步": "#e41a1c", "乱序": "#ff7f00", "非法终止": "#984ea3"}
+    v_labels = {}
     for v in violations:
         vtype = v.get("type", "?")
         fs = v.get("frame_start", 0)
+        desc = v.get("description", "")
         color = v_colors.get(vtype, "#000000")
-        ax1.axvline(x=fs, color=color, linewidth=2, linestyle="--", alpha=0.8)
-        ax1.annotate(vtype, xy=(fs, 0.85), fontsize=8, color=color,
-                     rotation=90, va="bottom", fontweight="bold")
 
-    ax1.set_ylabel("工序块 + 违规", fontsize=9)
-    ax1.set_xlabel("帧序号", fontsize=10)
-    ax1.set_ylim(0, 1)
-    ax1.set_yticks([])
+        # 偏移避免重叠
+        offset = 0.15 * v_labels.get(fs, 0)
+        v_labels[fs] = v_labels.get(fs, 0) + 1
+
+        ax1.axvline(x=fs, color=color, linewidth=2.5, linestyle="--", alpha=0.9)
+        ax1.annotate(f"{vtype}: {desc}", xy=(fs, 0.9 - offset),
+                     fontsize=8, color=color, va="top", fontweight="bold",
+                     bbox=dict(boxstyle="round,pad=0.3", facecolor="white",
+                               edgecolor=color, alpha=0.85))
+
+    if not violations:
+        ax1.text(total_frames / 2, 0.5, "[合规] 未检测到违规", ha="center", va="center",
+                 fontsize=14, color="#2ca02c", fontweight="bold")
+    ax1.set_ylabel("违规检测", fontsize=10)
+    ax1.set_xlabel("帧序号", fontsize=11)
     for spine in ("top", "right", "left"):
         ax1.spines[spine].set_visible(False)
 
-    title = f"违规检测 — {filename}" if filename else "违规检测"
-    fig.suptitle(title, fontsize=11, y=1.01)
     plt.tight_layout()
-
     os.makedirs(save_dir, exist_ok=True)
     safe = filename.replace("/", "_").replace("\\", "_") or "sample"
-    fig.savefig(os.path.join(save_dir, f"{safe}.png"), dpi=150, bbox_inches="tight")
+    fig.savefig(os.path.join(save_dir, f"{safe}.png"), dpi=300, bbox_inches="tight",
+                facecolor="white", edgecolor="none")
+    fig.savefig(os.path.join(save_dir, f"{safe}.pdf"), bbox_inches="tight",
+                facecolor="white", edgecolor="none")
     plt.close(fig)
 
 
