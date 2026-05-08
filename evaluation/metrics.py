@@ -1,7 +1,7 @@
 """评估指标：准确率、精确率、召回率、F1。"""
 
 import numpy as np
-from typing import Dict, List, Optional
+from typing import Dict, List
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 
 

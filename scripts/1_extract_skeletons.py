@@ -19,6 +19,8 @@ import numpy as np
 import mediapipe as mp
 from tqdm import tqdm
 
+from src.config_loader import load_config
+
 mp_pose = mp.solutions.pose
 mp_drawing = mp.solutions.drawing_utils
 
@@ -43,6 +45,10 @@ def extract_skeleton(video_path, out_path, show_preview=False):
         frame_count: 有效帧数
     """
     cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print(f"  [WARN] 无法打开视频文件: {video_path}")
+        return 0
+
     skeletons = []
 
     while True:
@@ -81,16 +87,24 @@ def extract_skeleton(video_path, out_path, show_preview=False):
 
 
 def main():
+    cfg = load_config()
+    ds_cfg = cfg.get("dataset", {})
+
     parser = argparse.ArgumentParser(description="MediaPipe 骨架提取")
-    parser.add_argument("--video_dir", type=str, required=True,
+    parser.add_argument("--video_dir", type=str,
+                        default=ds_cfg.get("raw_video_dir", "data/raw_videos/"),
                         help="原始视频目录")
-    parser.add_argument("--out_dir", type=str, default="data/skeletons",
+    parser.add_argument("--out_dir", type=str,
+                        default=ds_cfg.get("skeleton_dir", "data/skeletons/"),
                         help="骨架 .npy 输出目录")
     parser.add_argument("--ext", type=str, default=".mp4",
                         help="视频文件扩展名，默认 .mp4")
     parser.add_argument("--show", action="store_true",
                         help="显示骨架可视化预览")
     args = parser.parse_args()
+
+    if not os.path.isdir(args.video_dir):
+        raise FileNotFoundError(f"视频目录不存在: {args.video_dir}")
 
     video_files = sorted([
         f for f in os.listdir(args.video_dir)

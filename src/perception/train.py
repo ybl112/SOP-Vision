@@ -64,7 +64,9 @@ def validate_epoch(model, loader, criterion, device):
 
 def train_model(data_dir: str, train_csv: str, test_csv: str = None,
                 window_size: int = 32, batch_size: int = 32, epochs: int = 50,
-                lr: float = 0.001, save_path: str = "outputs/models/best_model.pt",
+                lr: float = 0.001, weight_decay: float = 0.0001,
+                num_classes: int = 7, in_channels: int = 3,
+                save_path: str = "outputs/models/best_model.pt",
                 device: str = None):
     """完整训练流程，返回最佳验证准确率。"""
     if device is None:
@@ -74,9 +76,9 @@ def train_model(data_dir: str, train_csv: str, test_csv: str = None,
     val_csv = test_csv if test_csv else train_csv
     val_loader = get_dataloader(data_dir, val_csv, batch_size, "test", window_size)
 
-    model = STGCN(num_classes=7, in_channels=3).to(device)
+    model = STGCN(num_classes=num_classes, in_channels=in_channels).to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = CosineAnnealingLR(optimizer, T_max=epochs)
 
     os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)

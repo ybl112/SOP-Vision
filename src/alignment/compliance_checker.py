@@ -37,23 +37,25 @@ class ProcedureComplianceChecker:
     # ---- 主检测接口 ----
 
     def detect(self, blocks: List[Dict],
-               action_probs: Optional[np.ndarray] = None) -> List[Dict]:
+               action_probs: Optional[np.ndarray] = None,
+               return_path: bool = False):
         """
         检测工序违规。
 
         Args:
             blocks: 压缩后的工序块 [{"label":int, "start":int, "end":int}, ...]
             action_probs: 每个块的平均类别概率 (N, 7)，可选
+            return_path: 是否同时返回 DTW 对齐路径（用于可视化）
 
         Returns:
-            违规列表 [{"type": str, "frame_start": int, "missing_steps": list,
-                       "current_step": str, "description": str}, ...]
+            若 return_path=False: 违规列表
+            若 return_path=True: (违规列表, 对齐路径, query数组, template数组)
         """
         violations = []
         filtered_blocks = [b for b in blocks if b["label"] in CLASS_TO_STEP]
 
         if len(filtered_blocks) < 2:
-            return violations
+            return (violations, [], np.array([]), np.arange(self.num_steps)) if return_path else violations
 
         # 提取步骤序列
         step_seq = np.array([CLASS_TO_STEP[b["label"]] for b in filtered_blocks])
@@ -68,6 +70,8 @@ class ProcedureComplianceChecker:
         violations += self._detect_from_path(path, query, template, filtered_blocks)
         violations += self._check_early_termination(step_seq, filtered_blocks)
 
+        if return_path:
+            return violations, path, query, template
         return violations
 
     # ---- DTW 对齐 ----
@@ -81,7 +85,6 @@ class ProcedureComplianceChecker:
         """
         try:
             from fastdtw import fastdtw
-            from scipy.spatial.distance import euclidean
 
             dist, path = fastdtw(
                 query.reshape(-1, 1),
@@ -199,43 +202,6 @@ class ProcedureComplianceChecker:
             })
 
         return violations
-
-
-# ------- 两个实验方法 -------
-
-def method_one_proposed(test_blocks: List[Dict],
-                        test_probs: Optional[np.ndarray],
-                        template: np.ndarray,
-                        state_machine: ProcedureStateMachine,
-                        window_size: int = 2) -> Dict:
-    """
-    本文方法：基于规程知识-状态机的 DTW 合规检查。
-
-    Returns:
-        {"violations": [...], "dtw_distance": float, "aligned_path": [...]}
-    """
-    checker = ProcedureComplianceChecker(state_machine, window_size=window_size)
-    violations = checker.detect(test_blocks, test_probs)
-
-    # 计算 DTW 距离
-    from src.alignment.utils import blocks_to_step_sequence
-    steps = np.array(blocks_to_step_sequence(test_blocks, CLASS_TO_STEP), dtype=np.float64)
-    if len(steps) > 0:
-        try:
-            from fastdtw import fastdtw
-            dtw_dist, path = fastdtw(
-                steps.reshape(-1, 1),
-                template.reshape(-1, 1),
-                radius=min(window_size, max(len(steps), len(template))),
-                dist=checker._custom_distance,
-            )
-        except ImportError:
-            dtw_dist, path = checker._simple_dtw(steps, template), []
-    else:
-        dtw_dist = float("inf")
-        path = []
-
-    return {"violations": violations, "dtw_distance": dtw_dist, "aligned_path": path}
 
 
 def method_two_baseline_dba(train_blocks_list: List[List[Dict]],

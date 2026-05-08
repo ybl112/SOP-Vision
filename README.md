@@ -23,48 +23,49 @@ pip install -r requirements.txt
 
 ```
 SOP-Vision/
+├── train.py                              # 训练入口（直接改脚本顶部参数）
+├── extract.py                            # 骨架提取入口
+├── run.py                                # 推理实验入口
 ├── config/
-│   ├── config.yaml
+│   ├── config.yaml                       # 全局配置
 │   └── procedure_rules/
-│       └── switching_operation.yaml     # 倒闸操作规程：步骤定义+合法转移矩阵
-├── data/                                # 用户自行准备
-│   ├── raw_videos/                      # 原始视频文件
-│   ├── skeletons/                       # MediaPipe 提取的骨架序列 .npy
+│       └── switching_operation.yaml      # 倒闸操作规程
+├── data/                                 # 用户自行准备
+│   ├── raw_videos/                       # 原始视频
+│   ├── skeletons/                        # 骨架序列 .npy
 │   └── labels/
-│       ├── train.csv                    # 训练标注
-│       └── test.csv                     # 测试标注（含违规流程）
+│       ├── train.csv                     # 训练标注
+│       └── test.csv                      # 测试标注
 ├── src/
-│   ├── config_loader.py                 # YAML 配置加载
-│   ├── data/
-│   │   └── dataset.py                   # PyTorch Dataset + DataLoader
+│   ├── config_loader.py
+│   ├── data/dataset.py
 │   ├── perception/
-│   │   ├── pose_estimator.py            # MediaPipe 33 关键点封装
-│   │   ├── st_gcn.py                    # ST-GCN 模型定义（可替换）
-│   │   └── train.py                     # 训练循环
+│   │   ├── st_gcn.py                     # ST-GCN 模型
+│   │   └── train.py                      # 训练逻辑
 │   ├── knowledge/
-│   │   ├── procedure_template.py        # class_id↔步骤映射 + 合规模板
-│   │   └── state_machine.py             # 规程状态机（从 YAML 构建）
+│   │   ├── procedure_template.py
+│   │   └── state_machine.py
 │   └── alignment/
-│       ├── utils.py                     # 序列压缩 / 特征构建
-│       └── compliance_checker.py        # DTW 违规检测器
+│       ├── utils.py
+│       └── compliance_checker.py         # DTW 违规检测
 ├── evaluation/
-│   ├── metrics.py                       # 分类+违规检测评估指标
-│   └── baselines.py                     # Baseline1(纯分类)/Baseline2(DBA+DTW)
+│   ├── metrics.py
+│   └── baselines.py
 ├── scripts/
-│   ├── 1_extract_skeletons.py           # 步骤1：视频→骨架提取
-│   ├── 2_train_classifier.py            # 步骤2：训练动作分类器
-│   └── 3_run_experiment.py              # 步骤3：端到端对比实验
-├── outputs/                             # 自动生成
-│   ├── models/                          # 训练好的模型权重 .pt
-│   ├── results/                         # 实验结果 CSV
-│   └── logs/                            # 训练日志
+│   ├── 1_extract_skeletons.py
+│   ├── 2_train_classifier.py
+│   └── 3_run_experiment.py
+├── outputs/                              # 自动生成
+│   ├── models/best_model.pt              # 训练好的模型
+│   ├── inference/test_inference.npy      # 推理缓存
+│   ├── results/comparison.csv            # 评估结果
+│   ├── dtw/*.png                         # 每样本 DTW 对齐图
+│   └── timeline/*.png                    # 每样本违规时间线图
 ├── requirements.txt
 └── README.md
 ```
 
 ## 场景说明
-
-本项目的默认场景为**电力倒闸操作**，依据《电力安全工作规程》GB 26860。倒闸操作是变电站最常见的作业类型，具有严格的操作序列要求，天然适合工序合规检测任务。
 
 ### 五步规程流程
 
@@ -86,10 +87,10 @@ SOP-Vision/
 
 ### 更换场景
 
-本项目的前端（动作识别）与后端（规程合规）完全解耦。更换工序时仅需：
+前端（动作识别）与后端（规程合规）完全解耦。更换工序仅需：
 
 1. 在 `config/procedure_rules/` 下新建 YAML 规程文件
-2. 修改 `config/config.yaml` 中 `compliance.procedure` 字段指向新文件
+2. 修改 `config/config.yaml` 中 `compliance.procedure` 字段
 3. 前端模型和数据标注保持不变
 
 ## 数据准备
@@ -97,19 +98,11 @@ SOP-Vision/
 ### 1. 录制视频
 
 - 按倒闸操作规程录制作业视频
-- 需要覆盖：正常流程 ≥3 次，漏步/乱序/非法终止各 ≥2 次
+- 覆盖：正常流程 ≥3 次，漏步/乱序/非法终止各 ≥2 次
 - 每个视频 1–3 分钟，帧率 ≥15 fps
 - 放入 `data/raw_videos/`
 
-### 2. 提取骨架
-
-```bash
-python scripts/1_extract_skeletons.py --video_dir data/raw_videos --out_dir data/skeletons
-```
-
-输出：每个视频生成一个同名 `.npy` 文件，shape = `(总帧数, 99)`。
-
-### 3. 标注格式
+### 2. 标注格式
 
 CSV 格式（`data/labels/train.csv` 和 `data/labels/test.csv`）：
 
@@ -144,36 +137,126 @@ worker_C_early_01.npy,0:0-5;1:6-24;2:25-44;3:45-65;4:66-82;6:83-85,1-2-3-4
 | 5 | 悬挂标示牌 | 悬挂警示标示牌 |
 | 6 | 工序间调整 | 步骤间的过渡/穿插动作 |
 
-## 运行步骤
-
-### 步骤 1：骨架提取
+## 快速开始
 
 ```bash
-python scripts/1_extract_skeletons.py --video_dir data/raw_videos --out_dir data/skeletons
+# 1. 提取骨架
+python extract.py
+
+# 2. 训练模型
+python train.py
+
+# 3. 推理实验
+python run.py
 ```
 
-### 步骤 2：训练动作分类器
+每个脚本顶部的 `# ==== 参数 ====` 区域可直接修改参数，无需命令行参数。
 
-```bash
-python scripts/2_train_classifier.py \
-    --data_dir data/skeletons \
-    --train_csv data/labels/train.csv \
-    --test_csv data/labels/test.csv \
-    --epochs 50 --batch_size 32
-```
+## 参数说明
+
+### extract.py — 骨架提取
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `VIDEO_DIR` | `data/raw_videos` | 原始视频目录 |
+| `OUT_DIR` | `data/skeletons` | 骨架 .npy 输出目录 |
+| `VIDEO_EXT` | `.mp4` | 视频文件扩展名 |
+| `SHOW_PREVIEW` | `False` | 是否显示骨架预览窗口 |
+
+### train.py — 训练
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `EPOCHS` | `50` | 训练轮数 |
+| `BATCH_SIZE` | `32` | 批次大小 |
+| `LR` | `0.001` | 学习率 |
+| `WEIGHT_DECAY` | `0.0001` | 权重衰减 |
+| `WINDOW_SIZE` | `32` | 输入时间窗口帧数 |
+
+命令行覆盖（可选）：`python train.py --epochs 100 --lr 0.01`
 
 训练完成后模型保存至 `outputs/models/best_model.pt`。
 
-### 步骤 3：运行对比实验
+### run.py — 推理实验
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `SKIP_INFERENCE` | `False` | `True` = 使用推理缓存，跳过模型推理 |
+
+### config.yaml — 全局配置
+
+`config/config.yaml` 中的主要配置项（命令行参数默认值均从此读取）：
+
+**数据集：**
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `dataset.skeleton_dir` | `data/skeletons/` | 骨架数据目录 |
+| `dataset.label_csv_dir` | `data/labels/` | 标注 CSV 目录 |
+| `dataset.num_classes` | `7` | 动作类别数 |
+
+**模型：**
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `model.in_channels` | `3` | 输入通道 (x,y,z) |
+| `model.num_nodes` | `33` | MediaPipe 关键点数 |
+| `model.window_size` | `32` | 时间窗口帧数 |
+
+**训练：**
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `train.batch_size` | `32` | 批次大小 |
+| `train.epochs` | `50` | 训练轮数 |
+| `train.lr` | `0.001` | 学习率 |
+| `train.weight_decay` | `0.0001` | 权重衰减 |
+| `train.save_dir` | `outputs/models/` | 模型保存目录 |
+
+**合规检测：**
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `compliance.window_size` | `2` | DTW 搜索窗口 |
+| `compliance.transition_cost` | `0.1` | 状态转移代价 |
+| `compliance.skip_penalty` | `1.0` | 漏步惩罚 |
+
+**输出：**
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| `output.result_dir` | `outputs/results/` | 结果 CSV 输出 |
+| `output.inference_dir` | `outputs/inference/` | 推理缓存 |
+| `output.dtw_dir` | `outputs/dtw/` | DTW 对齐图 |
+| `output.timeline_dir` | `outputs/timeline/` | 违规时间线图 |
+
+### 命令行覆盖（所有脚本均支持）
+
+除了直接修改脚本顶部的参数外，所有参数都可以在命令行临时覆盖：
 
 ```bash
-python scripts/3_run_experiment.py
+python extract.py --video_dir my_videos --show
+python train.py --epochs 100 --batch_size 16 --lr 0.01
+python run.py --skip_inference
 ```
 
-实验对比三种方法（纯分类器 / DBA模板+DTW / 状态机+DTW），结果输出至 `outputs/results/comparison.csv`。
+## 输出结果
+
+运行 `python run.py` 后 `outputs/` 目录结构：
+
+```
+outputs/
+├── models/
+│   └── best_model.pt                   # 训练好的 ST-GCN 权重
+├── inference/
+│   └── test_inference.npy              # 推理缓存（用于 --skip_inference）
+├── results/
+│   └── comparison.csv                  # 三种方法评测对比
+├── dtw/
+│   ├── sample_01.png                   # 每样本 DTW 对齐路径图
+│   └── ...
+└── timeline/
+    ├── sample_01.png                   # 每样本违规检测时间线
+    └── ...
+```
 
 ## 引用说明
 
-- ST-GCN 参考开源实现 [st-gcn](https://github.com/yysijie/st-gcn)
+- ST-GCN 参考 [st-gcn](https://github.com/yysijie/st-gcn)
 - DTW 对齐使用 [fastdtw](https://github.com/slaypni/fastdtw)
 - 规程知识来源于《电力安全工作规程（发电厂和变电站电气部分）》GB 26860

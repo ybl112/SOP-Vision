@@ -60,4 +60,6 @@ evaluation:
 # ---- 输出 ----
 output:
   result_dir: "outputs/results/"
-  viz_dir: "outputs/visualizations/"
+  inference_dir: "outputs/inference/"
+  dtw_dir: "outputs/dtw/"
+  timeline_dir: "outputs/timeline/"
