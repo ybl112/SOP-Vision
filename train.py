@@ -13,14 +13,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from src.config_loader import load_config
 from src.perception.train import train_model
 
+_cfg = load_config()
+_ds = _cfg.get("dataset", {})
+_tr = _cfg.get("train", {})
+_md = _cfg.get("model", {})
+
 # ============================================================
-#  训练参数（直接在这里改）
+#  训练参数（直接在这里改，默认值来自 config.yaml）
 # ============================================================
-EPOCHS       = 50
-BATCH_SIZE   = 32
-LR           = 0.001
-WEIGHT_DECAY = 0.0001
-WINDOW_SIZE  = 32
+EPOCHS       = _tr.get("epochs", 50)
+BATCH_SIZE   = _tr.get("batch_size", 32)
+LR           = _tr.get("lr", 0.001)
+WEIGHT_DECAY = _tr.get("weight_decay", 0.0001)
+WINDOW_SIZE  = _md.get("window_size", 32)
 # ============================================================
 
 if __name__ == "__main__":

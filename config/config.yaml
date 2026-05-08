@@ -22,8 +22,6 @@ dataset:
 model:
   name: "ST-GCN"
   in_channels: 3                  # (x, y, z)
-  num_nodes: 33                   # MediaPipe Pose 关键点数
-  num_classes: 7
   window_size: 32                 # 输入时间窗口帧数
 
 # ---- 训练 ----
@@ -32,30 +30,13 @@ train:
   epochs: 50
   lr: 0.001
   weight_decay: 0.0001
-  scheduler: "cosine"
   save_dir: "outputs/models/"
-  log_dir: "outputs/logs/"
 
 # ---- 规程违规检测 ----
 compliance:
-  procedure: "switching_operation" # 对应 config/procedure_rules/ 下的规程文件
   window_size: 2                  # DTW 搜索窗口大小
   transition_cost: 0.1            # 状态转移代价
   skip_penalty: 1.0               # 漏步惩罚
-  dba_iterations: 5               # DBA 平均迭代次数（Baseline 2）
-
-# ---- 评估 ----
-evaluation:
-  methods:
-    - "proposed"                  # 本方法: DTW + 状态机
-    - "baseline1"                 # 纯分类器
-    - "baseline2"                 # DBA 模板 + DTW
-  metrics:
-    - "accuracy"
-    - "precision"
-    - "recall"
-    - "f1"
-    - "violation_detection_rate"
 
 # ---- 输出 ----
 output:

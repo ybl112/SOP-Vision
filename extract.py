@@ -17,13 +17,16 @@ import mediapipe as mp
 from tqdm import tqdm
 from src.config_loader import load_config
 
+_cfg = load_config()
+_ds = _cfg.get("dataset", {})
+
 # ============================================================
-#  提取参数（直接在这里改）
+#  提取参数（直接在这里改，默认值来自 config.yaml）
 # ============================================================
-VIDEO_DIR    = "data/raw_videos"        # 视频目录
-OUT_DIR      = "data/skeletons"         # 骨架输出目录
-VIDEO_EXT    = ".mp4"                   # 视频扩展名
-SHOW_PREVIEW = False                    # 是否显示骨架预览窗口
+VIDEO_DIR    = _ds.get("raw_video_dir", "data/raw_videos")
+OUT_DIR      = _ds.get("skeleton_dir", "data/skeletons")
+VIDEO_EXT    = ".mp4"
+SHOW_PREVIEW = False
 # ============================================================
 
 mp_pose = mp.solutions.pose

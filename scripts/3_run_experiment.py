@@ -125,8 +125,9 @@ def run_stgcn_inference(cfg: dict, samples: list, device: str = None):
 
     num_classes = cfg.get("dataset", {}).get("num_classes", 7)
     window_size = cfg.get("model", {}).get("window_size", 32)
+    in_channels = cfg.get("model", {}).get("in_channels", 3)
 
-    model = STGCN(num_classes=num_classes, in_channels=3)
+    model = STGCN(num_classes=num_classes, in_channels=in_channels)
     model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     model.to(device)
     model.eval()
