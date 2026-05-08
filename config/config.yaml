@@ -1,0 +1,63 @@
+# ============================================================
+# SOP-Vision 全局配置文件
+# ============================================================
+
+# ---- 数据集 ----
+dataset:
+  name: "switching_operation"     # 数据集名称
+  raw_video_dir: "data/raw_videos/"
+  skeleton_dir: "data/skeletons/"
+  label_csv_dir: "data/labels/"
+  num_classes: 7                  # 0=背景, 1-5=工序步骤, 6=其他动作
+  class_names:
+    0: "background"
+    1: "接令核对"
+    2: "验电"
+    3: "拉闸断电"
+    4: "挂接地线"
+    5: "悬挂标示牌"
+    6: "other"
+
+# ---- 模型 ----
+model:
+  name: "ST-GCN"
+  in_channels: 3                  # (x, y, z)
+  num_nodes: 33                   # MediaPipe Pose 关键点数
+  num_classes: 7
+  window_size: 32                 # 输入时间窗口帧数
+
+# ---- 训练 ----
+train:
+  batch_size: 32
+  epochs: 50
+  lr: 0.001
+  weight_decay: 0.0001
+  scheduler: "cosine"
+  save_dir: "outputs/models/"
+  log_dir: "outputs/logs/"
+
+# ---- 规程违规检测 ----
+compliance:
+  procedure: "switching_operation" # 对应 config/procedure_rules/ 下的规程文件
+  window_size: 2                  # DTW 搜索窗口大小
+  transition_cost: 0.1            # 状态转移代价
+  skip_penalty: 1.0               # 漏步惩罚
+  dba_iterations: 5               # DBA 平均迭代次数（Baseline 2）
+
+# ---- 评估 ----
+evaluation:
+  methods:
+    - "proposed"                  # 本方法: DTW + 状态机
+    - "baseline1"                 # 纯分类器
+    - "baseline2"                 # DBA 模板 + DTW
+  metrics:
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1"
+    - "violation_detection_rate"
+
+# ---- 输出 ----
+output:
+  result_dir: "outputs/results/"
+  viz_dir: "outputs/visualizations/"

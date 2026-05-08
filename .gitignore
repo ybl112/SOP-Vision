@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# 数据 & 模型（仅排除大文件，CSV 标注保留）
+data/raw_videos/*
+!data/raw_videos/.gitkeep
+data/skeletons/*
+!data/skeletons/.gitkeep
+outputs/models/*.pt
+outputs/results/
+outputs/logs/
+outputs/visualizations/
+
+# IDE
+.vscode/
+.idea/
+
+# Conda / venv
+env/
+venv/
+.conda/
+
+# OS
+.DS_Store
+Thumbs.db
